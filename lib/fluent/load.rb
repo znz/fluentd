@@ -9,6 +9,8 @@ require 'json'
 require 'yajl'
 require 'uri'
 require 'msgpack'
+# I hate global variable but we suffer pain now for the sake of future
+$use_msgpack_5 = defined?(MessagePack::Packer) ? true : false
 require 'cool.io'
 require 'cool.io/eventmachine'
 require 'fluent/env'
