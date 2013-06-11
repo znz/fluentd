@@ -274,7 +274,7 @@ class Log
           record[key] = record[key].inspect unless record[key].respond_to?(:to_msgpack)
         }
         record['message'] = message.dup
-        @emit_thread.emit(tag, time, record)
+        @emit_thread.emit("#{@tag}.#{level}", time, record)
       end
     end
 
