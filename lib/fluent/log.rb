@@ -46,7 +46,6 @@ class Log
     @out = out
     @level = level
     @debug_mode = false
-    @self_event = false
     @tag = 'fluent'
     @time_format = '%Y-%m-%d %H:%M:%S %z '
     enable_color out.tty?
@@ -63,7 +62,12 @@ class Log
   end
 
   def enable_event(b=true)
-    @self_event = b
+    if b && !@emit_thread
+      @emit_thread = BackgroundEmitThread.new
+    elsif !b && @emit_thread
+      @emit_thread.finish!
+      @emit_thread = nil
+    end
     self
   end
 
@@ -237,6 +241,14 @@ class Log
     @out.flush
   end
 
+  def internal_error(*args, &block)
+    return if @level > LEVEL_ERROR
+    args << block.call if block
+    time = Time.now
+    time, msg = event(:error, args)
+    puts [@color_error, caller_line(time, 1, LEVEL_ERROR), msg, @color_reset].join
+  end
+
   private
   def event(level, args)
     time = Time.now
@@ -252,23 +264,17 @@ class Log
       end
     }
 
-    if @self_event
-      c = caller
-      if c.count(c.shift) <= 0
+    if @emit_thread
+      # suppresses event logging in event logging
+      stack = caller
+      stack.shift
+      unless stack.any? {|line| line.include?(__FILE__) }
         record = map.dup
         record.keys.each {|key|
           record[key] = record[key].inspect unless record[key].respond_to?(:to_msgpack)
         }
         record['message'] = message.dup
-        ### In signal trap context, 'Engine.emit' cannot get Monitor lock (Thread level lock),
-        ### and ThreadError will be raised
-        begin
-          Engine.emit("#{@tag}.#{level}", time.to_i, record)
-        rescue ThreadError # message: can't be called from trap context
-          # ignore
-        end
-        # TODO: We should check 'GET_THREAD()->interrupt_mask & TRAP_INTERRUPT_MASK'
-        #       for replacement of begin-rescue if any methods exists.
+        @emit_thread.emit(tag, time, record)
       end
     end
 
@@ -291,6 +297,41 @@ class Log
       end
     end
     return log_msg
+  end
+
+  class BackgroundEmitThread < Thread
+    def initialize
+      @queue = []
+      @finished = false
+      super(&method(:run))
+    end
+
+    def emit(tag, time, record)
+      # doesn't lock mutex so that signal handlers don't deadlock
+      @queue << [tag, time, record]
+    end
+
+    def finish!
+      @finished = true
+    end
+
+    def run
+      until @finished
+        sleep 0.1
+        next if @queue.empty?  # (just for performance)
+
+        events = @queue.slice!(0..-1)
+        next if events.empty?
+
+        events.each {|tag,time,record|
+          begin
+            Engine.emit(tag, time, record)
+          rescue
+            $log.error "failed to emit a fluentd internal log event", :tag => tag, :event => record, :error => $!
+          end
+        }
+      end
+    end
   end
 end
 

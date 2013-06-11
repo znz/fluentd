@@ -29,11 +29,15 @@ class EngineClass
 
     @suppress_emit_error_log_interval = 0
     @next_emit_error_log_time = nil
+
+    @log_tag = 'fluent'
   end
 
   MATCH_CACHE_SIZE = 1024
 
   attr_reader :matches, :sources
+
+  attr_accessor :log_tag
 
   def init
     BasicSocket.do_not_reverse_lookup = true
