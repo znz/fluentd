@@ -40,7 +40,7 @@ module Fluent
 
     LEVEL_TEXT = %w(trace debug info warn error fatal)
 
-    def initialize(out=STDERR, level=LEVEL_TRACE)
+    def initialize(out=STDERR, level=LEVEL_TRACE, opts={})
       @out = out
       @level = level
       @debug_mode = false
@@ -50,6 +50,11 @@ module Fluent
       enable_color out.tty?
       # TODO: This variable name is unclear so we should change to better name.
       @threads_exclude_events = []
+
+      if opts.has_key?(:suppress_same_error)
+        @suppress_same_error = opts[:suppress_same_error]
+        @last_backtrace = {}
+      end
     end
 
     attr_accessor :out
@@ -110,12 +115,7 @@ module Fluent
     alias TRACE trace
 
     def trace_backtrace(backtrace=$!.backtrace)
-      return if @level > LEVEL_TRACE
-      time = Time.now
-      backtrace.each {|msg|
-        puts ["  ", caller_line(time, 4, LEVEL_TRACE), msg].join
-      }
-      nil
+      dump_stacktrace(backtrace, LEVEL_TRACE)
     end
 
     def on_debug(&block)
@@ -133,12 +133,7 @@ module Fluent
     alias DEBUG debug
 
     def debug_backtrace(backtrace=$!.backtrace)
-      return if @level > LEVEL_DEBUG
-      time = Time.now
-      backtrace.each {|msg|
-        puts ["  ", caller_line(time, 4, LEVEL_DEBUG), msg].join
-      }
-      nil
+      dump_stacktrace(backtrace, LEVEL_DEBUG)
     end
 
     def on_info(&block)
@@ -156,12 +151,7 @@ module Fluent
     alias INFO info
 
     def info_backtrace(backtrace=$!.backtrace)
-      return if @level > LEVEL_INFO
-      time = Time.now
-      backtrace.each {|msg|
-        puts ["  ", caller_line(time, 4, LEVEL_INFO), msg].join
-      }
-      nil
+      dump_stacktrace(backtrace, LEVEL_INFO)
     end
 
     def on_warn(&block)
@@ -179,12 +169,7 @@ module Fluent
     alias WARN warn
 
     def warn_backtrace(backtrace=$!.backtrace)
-      return if @level > LEVEL_WARN
-      time = Time.now
-      backtrace.each {|msg|
-        puts ["  ", caller_line(time, 4, LEVEL_WARN), msg].join
-      }
-      nil
+      dump_stacktrace(backtrace, LEVEL_WARN)
     end
 
     def on_error(&block)
@@ -202,12 +187,7 @@ module Fluent
     alias ERROR error
 
     def error_backtrace(backtrace=$!.backtrace)
-      return if @level > LEVEL_ERROR
-      time = Time.now
-      backtrace.each {|msg|
-        puts ["  ", caller_line(time, 4, LEVEL_ERROR), msg].join
-      }
-      nil
+      dump_stacktrace(backtrace, LEVEL_ERROR)
     end
 
     def on_fatal(&block)
@@ -225,12 +205,7 @@ module Fluent
     alias FATAL fatal
 
     def fatal_backtrace(backtrace=$!.backtrace)
-      return if @level > LEVEL_FATAL
-      time = Time.now
-      backtrace.each {|msg|
-        puts ["  ", caller_line(time, 4, LEVEL_FATAL), msg].join
-      }
-      nil
+      dump_stacktrace(backtrace, LEVEL_FATAL)
     end
 
     def puts(msg)
@@ -251,6 +226,22 @@ module Fluent
     end
 
     private
+
+    def dump_stacktrace(backtrace, level)
+      return if @level > level
+
+      if !@suppress_same_error || @last_backtrace[Thread.current.object_id] != backtrace
+        time = Time.now
+        backtrace.each { |msg|
+          puts ["  ", caller_line(time, 4, level), msg].join
+        }
+        if @suppress_same_error
+          @last_backtrace[Thread.current.object_id] = backtrace
+        end
+      end
+      nil
+    end
+
     def event(level, args)
       time = Time.now
       message = ''
