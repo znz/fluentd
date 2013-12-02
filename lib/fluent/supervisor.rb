@@ -69,9 +69,10 @@ module Fluent
       @suppress_interval = opt[:suppress_interval]
       @dry_run = opt[:dry_run]
       @suppress_config_dump = opt[:suppress_config_dump]
-      @suppress_same_error = opt[:suppress_same_error]
+      @suppress_repeated_stacktrace_interval = opt[:suppress_repeated_stacktrace_interval]
 
-      @log = LoggerInitializer.new(@log_path, @log_level, @chuser, @chgroup, :suppress_same_error => @suppress_same_error)
+      log_opts = {:suppress_repeated_stacktrace_interval => @suppress_repeated_stacktrace_interval}
+      @log = LoggerInitializer.new(@log_path, @log_level, @chuser, @chgroup, log_opts)
       @finished = false
       @main_pid = nil
     end

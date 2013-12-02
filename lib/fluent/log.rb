@@ -51,9 +51,8 @@ module Fluent
       # TODO: This variable name is unclear so we should change to better name.
       @threads_exclude_events = []
 
-      if opts.has_key?(:suppress_same_error)
-        @suppress_same_error = opts[:suppress_same_error]
-        @last_backtrace = {}
+      if opts.has_key?(:suppress_repeated_stacktrace_interval)
+        @suppress_repeated_stacktrace_interval = opts[:suppress_repeated_stacktrace_interval]
       end
     end
 
@@ -230,16 +229,24 @@ module Fluent
     def dump_stacktrace(backtrace, level)
       return if @level > level
 
-      if !@suppress_same_error || @last_backtrace[Thread.current.object_id] != backtrace
+      if @suppress_repeated_stacktrace_interval.zero? || suppress_stacktrace?(backtrace)
         time = Time.now
         backtrace.each { |msg|
           puts ["  ", caller_line(time, 5, level), msg].join
         }
-        if @suppress_same_error
-          @last_backtrace[Thread.current.object_id] = backtrace
-        end
       end
       nil
+    end
+
+    def suppress_stacktrace?(backtrace)
+      now = Time.now.to_i
+      if (Thread.current[:last_repeated_stacktrace] != backtrace) || (now > Thread.current[:next_dump_stacktrace_time])
+        Thread.current[:last_repeated_stacktrace] = backtrace
+        Thread.current[:next_dump_stacktrace_time] = now + @suppress_repeated_stacktrace_interval
+        true
+      else
+        false
+      end
     end
 
     def event(level, args)
