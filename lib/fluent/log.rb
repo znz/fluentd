@@ -233,7 +233,7 @@ module Fluent
       if !@suppress_same_error || @last_backtrace[Thread.current.object_id] != backtrace
         time = Time.now
         backtrace.each { |msg|
-          puts ["  ", caller_line(time, 4, level), msg].join
+          puts ["  ", caller_line(time, 5, level), msg].join
         }
         if @suppress_same_error
           @last_backtrace[Thread.current.object_id] = backtrace
