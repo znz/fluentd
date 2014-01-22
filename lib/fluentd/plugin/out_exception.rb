@@ -26,7 +26,7 @@ module Fluentd
       end
 
       def emit(tag, time, record)
-        raise "exception '#{tag}' #{time} #{Yajl.dump(ecord)}"
+        raise "exception '#{tag}' #{time} #{Yajl.dump(record)}"
       end
     end
 
