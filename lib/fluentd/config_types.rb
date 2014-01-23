@@ -104,4 +104,15 @@ module Fluentd
     end
   })
 
+  Configurable.register_type(:array, lambda {|val,opts|
+    case val
+    when Array
+      val
+    when String
+      JSON.load(val)
+    else
+      raise ConfigError, "array required but got #{val.inspect}"
+    end
+  })
+
 end
